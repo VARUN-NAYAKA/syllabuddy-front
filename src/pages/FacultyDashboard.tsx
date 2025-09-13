@@ -4,9 +4,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import FacultyHeader from '@/components/layout/FacultyHeader';
 import FacultySidebar from '@/components/layout/FacultySidebar';
 import StudentListModal from '@/components/StudentListModal';
+import GradingModal from '@/components/GradingModal';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { BookOpen, Calendar, FileText, Clipboard, TrendingUp, Users, Upload } from 'lucide-react';
+import { BookOpen, Calendar, FileText, Clipboard, TrendingUp, Users, Upload, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 const FacultyDashboard: React.FC = () => {
@@ -17,6 +18,8 @@ const FacultyDashboard: React.FC = () => {
   const [notesCount, setNotesCount] = useState(0);
   const [assignmentsCount, setAssignmentsCount] = useState(0);
   const [recentSubmissions, setRecentSubmissions] = useState<any[]>([]);
+  const [showGradingModal, setShowGradingModal] = useState(false);
+  const [selectedSubmission, setSelectedSubmission] = useState<any>(null);
   const { user, profile, loading } = useAuth();
   const navigate = useNavigate();
 
@@ -29,70 +32,105 @@ const FacultyDashboard: React.FC = () => {
   }, [user, profile, loading, navigate]);
 
   // Fetch dashboard data
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        // Fetch students
-        const { data: studentsData, error: studentsError } = await supabase
-          .from('profiles')
-          .select('id, full_name, usn_or_employee_id')
-          .eq('user_type', 'student');
+  const fetchDashboardData = async () => {
+    try {
+      // Fetch students
+      const { data: studentsData, error: studentsError } = await supabase
+        .from('profiles')
+        .select('id, full_name, usn_or_employee_id')
+        .eq('user_type', 'student');
+      
+      if (studentsError) throw studentsError;
+      
+      setStudents(studentsData || []);
+      setStudentsCount(studentsData?.length || 0);
+
+      // Fetch notes count for faculty's subject
+      if (profile?.subject) {
+        const { count: notesCount, error: notesError } = await supabase
+          .from('notes')
+          .select('*', { count: 'exact', head: true })
+          .eq('subject', profile.subject)
+          .eq('uploaded_by', user.id);
         
-        if (studentsError) throw studentsError;
-        
-        setStudents(studentsData || []);
-        setStudentsCount(studentsData?.length || 0);
-
-        // Fetch notes count for faculty's subject
-        if (profile?.subject) {
-          const { count: notesCount, error: notesError } = await supabase
-            .from('notes')
-            .select('*', { count: 'exact', head: true })
-            .eq('subject', profile.subject)
-            .eq('uploaded_by', user.id);
-          
-          if (!notesError) {
-            setNotesCount(notesCount || 0);
-          }
-
-          // Fetch assignments count for faculty's subject
-          const { count: assignmentsCount, error: assignmentsError } = await supabase
-            .from('assignments')
-            .select('*', { count: 'exact', head: true })
-            .eq('subject', profile.subject)
-            .eq('uploaded_by', user.id);
-          
-          if (!assignmentsError) {
-            setAssignmentsCount(assignmentsCount || 0);
-          }
-
-          // Fetch recent submissions for daily updates
-          const { data: submissionsData, error: submissionsError } = await supabase
-            .from('assignment_submissions')
-            .select(`
-              *,
-              assignments!inner(subject, title),
-              profiles!assignment_submissions_student_id_fkey(full_name, usn_or_employee_id)
-            `)
-            .eq('assignments.subject', profile.subject)
-            .order('submitted_at', { ascending: false })
-            .limit(10);
-
-          if (!submissionsError) {
-            setRecentSubmissions(submissionsData || []);
-          }
+        if (!notesError) {
+          setNotesCount(notesCount || 0);
         }
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-        setStudentsCount(0);
-        setNotesCount(0);
-        setAssignmentsCount(0);
-      }
-    };
 
+        // Fetch assignments count for faculty's subject
+        const { count: assignmentsCount, error: assignmentsError } = await supabase
+          .from('assignments')
+          .select('*', { count: 'exact', head: true })
+          .eq('subject', profile.subject)
+          .eq('uploaded_by', user.id);
+        
+        if (!assignmentsError) {
+          setAssignmentsCount(assignmentsCount || 0);
+        }
+
+        // Fetch recent submissions for daily updates
+        const { data: submissionsData, error: submissionsError } = await supabase
+          .from('assignment_submissions')
+          .select(`
+            *,
+            assignments!inner(subject, title),
+            profiles!assignment_submissions_student_id_fkey(full_name, usn_or_employee_id)
+          `)
+          .eq('assignments.subject', profile.subject)
+          .order('submitted_at', { ascending: false })
+          .limit(10);
+
+        if (!submissionsError) {
+          setRecentSubmissions(submissionsData || []);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      setStudentsCount(0);
+      setNotesCount(0);
+      setAssignmentsCount(0);
+    }
+  };
+
+  useEffect(() => {
     if (user && profile) {
       fetchDashboardData();
     }
+  }, [user, profile]);
+
+  // Set up real-time subscriptions for faculty
+  useEffect(() => {
+    if (!user || !profile || profile.user_type !== 'faculty') return;
+
+    const channel = supabase
+      .channel('faculty-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'assignment_submissions'
+        },
+        () => {
+          fetchDashboardData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'activities'
+        },
+        () => {
+          fetchDashboardData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user, profile]);
 
   if (loading) {
@@ -253,15 +291,31 @@ const FacultyDashboard: React.FC = () => {
                               </p>
                             </div>
                           </div>
-                          <div className="flex items-center space-x-2">
-                            {submission.marks !== null ? (
-                              <span className="text-sm font-medium text-green-600">
-                                Graded: {submission.marks}/10
-                              </span>
-                            ) : (
-                              <span className="text-sm text-muted-foreground">Pending</span>
-                            )}
-                          </div>
+                           <div className="flex items-center space-x-2">
+                             {submission.marks !== null ? (
+                               <span className="text-sm font-medium text-green-600">
+                                 Graded: {submission.marks}/10
+                               </span>
+                             ) : (
+                               <Button
+                                 size="sm"
+                                 onClick={() => {
+                                   setSelectedSubmission(submission);
+                                   setShowGradingModal(true);
+                                 }}
+                               >
+                                 Grade
+                               </Button>
+                             )}
+                             <Button
+                               variant="outline"
+                               size="sm"
+                               onClick={() => window.open(submission.file_url, '_blank')}
+                             >
+                               <Eye className="h-3 w-3 mr-1" />
+                               View
+                             </Button>
+                           </div>
                         </div>
                       ))}
                     </div>
@@ -304,6 +358,13 @@ const FacultyDashboard: React.FC = () => {
         isOpen={showStudentModal} 
         onClose={() => setShowStudentModal(false)} 
         students={students} 
+      />
+
+      <GradingModal
+        isOpen={showGradingModal}
+        onClose={() => setShowGradingModal(false)}
+        submission={selectedSubmission}
+        onGraded={fetchDashboardData}
       />
     </div>
   );

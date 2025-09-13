@@ -55,13 +55,13 @@ const Index = () => {
           ))}
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+        {/* Action Buttons - Mobile first layout */}
+        <div className="flex flex-col gap-4 justify-center items-center md:flex-row md:gap-6">
           <Button
             variant="hero"
             size="lg"
             onClick={() => navigate("/login/student")}
-            className="px-8 py-4 text-lg"
+            className="w-full max-w-xs px-8 py-4 text-lg md:w-auto"
           >
             Student Login
           </Button>
@@ -69,7 +69,7 @@ const Index = () => {
             variant="glass"
             size="lg"
             onClick={() => navigate("/login/faculty")}
-            className="px-8 py-4 text-lg"
+            className="w-full max-w-xs px-8 py-4 text-lg md:w-auto"
           >
             Faculty Login
           </Button>

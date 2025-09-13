@@ -32,6 +32,41 @@ const StudentDashboard: React.FC = () => {
     }
   }, [user]);
 
+  // Set up real-time subscriptions
+  useEffect(() => {
+    if (!user) return;
+
+    const activitiesChannel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'activities'
+        },
+        () => {
+          fetchDashboardData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'assignment_submissions'
+        },
+        () => {
+          fetchDashboardData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(activitiesChannel);
+    };
+  }, [user]);
+
   const deleteExpiredAssignments = async () => {
     try {
       await supabase.rpc('delete_expired_assignments');
