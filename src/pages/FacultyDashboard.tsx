@@ -6,7 +6,7 @@ import FacultySidebar from '@/components/layout/FacultySidebar';
 import StudentListModal from '@/components/StudentListModal';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { BookOpen, Calendar, FileText, Clipboard, TrendingUp, Users } from 'lucide-react';
+import { BookOpen, Calendar, FileText, Clipboard, TrendingUp, Users, Upload } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 const FacultyDashboard: React.FC = () => {
@@ -16,6 +16,7 @@ const FacultyDashboard: React.FC = () => {
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [notesCount, setNotesCount] = useState(0);
   const [assignmentsCount, setAssignmentsCount] = useState(0);
+  const [recentSubmissions, setRecentSubmissions] = useState<any[]>([]);
   const { user, profile, loading } = useAuth();
   const navigate = useNavigate();
 
@@ -63,6 +64,22 @@ const FacultyDashboard: React.FC = () => {
           
           if (!assignmentsError) {
             setAssignmentsCount(assignmentsCount || 0);
+          }
+
+          // Fetch recent submissions for daily updates
+          const { data: submissionsData, error: submissionsError } = await supabase
+            .from('assignment_submissions')
+            .select(`
+              *,
+              assignments!inner(subject, title),
+              profiles!assignment_submissions_student_id_fkey(full_name, usn_or_employee_id)
+            `)
+            .eq('assignments.subject', profile.subject)
+            .order('submitted_at', { ascending: false })
+            .limit(10);
+
+          if (!submissionsError) {
+            setRecentSubmissions(submissionsData || []);
           }
         }
       } catch (error) {
@@ -118,6 +135,11 @@ const FacultyDashboard: React.FC = () => {
         { label: 'Notes Uploaded', value: notesCount.toString(), icon: FileText },
         { label: 'Tasks Assigned', value: assignmentsCount.toString(), icon: Clipboard }
       ]
+    },
+    {
+      title: 'Daily Updates',
+      description: 'Recent student submissions and activities',
+      items: recentSubmissions
     }
   ];
 
@@ -199,6 +221,51 @@ const FacultyDashboard: React.FC = () => {
                       </div>
                     );
                   })}
+                </CardContent>
+              </Card>
+
+              {/* Daily Updates Card */}
+              <Card className="xl:col-span-3">
+                <CardHeader>
+                  <CardTitle>{dashboardCards[2].title}</CardTitle>
+                  <CardDescription>{dashboardCards[2].description}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {dashboardCards[2].items.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">No recent submissions</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {dashboardCards[2].items.map((submission: any, index: number) => (
+                        <div key={index} className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
+                          <div className="flex items-center space-x-4">
+                            <div className="p-2 bg-primary/10 rounded-lg">
+                              <Upload className="h-4 w-4 text-primary" />
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-foreground">
+                                {submission.profiles.full_name} submitted "{submission.assignments.title}"
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {submission.profiles.usn_or_employee_id} • {new Date(submission.submitted_at).toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            {submission.marks !== null ? (
+                              <span className="text-sm font-medium text-green-600">
+                                Graded: {submission.marks}/10
+                              </span>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">Pending</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>

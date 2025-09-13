@@ -5,10 +5,14 @@ import Header from '@/components/layout/Header';
 import Sidebar from '@/components/layout/Sidebar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { BookOpen, Calendar, FileText, Clipboard, TrendingUp, Clock, FileCheck, Trophy } from 'lucide-react';
+import { BookOpen, Calendar, FileText, Clipboard, TrendingUp, Clock, FileCheck, Trophy, Upload } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 const StudentDashboard: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [assignmentsUploaded, setAssignmentsUploaded] = useState(0);
+  const [assignmentsCompleted, setAssignmentsCompleted] = useState(0);
+  const [recentActivities, setRecentActivities] = useState<any[]>([]);
   const { user, profile, loading } = useAuth();
   const navigate = useNavigate();
 
@@ -19,6 +23,56 @@ const StudentDashboard: React.FC = () => {
       navigate('/faculty-dashboard');
     }
   }, [user, profile, loading, navigate]);
+
+  useEffect(() => {
+    if (user) {
+      fetchDashboardData();
+      // Delete expired assignments
+      deleteExpiredAssignments();
+    }
+  }, [user]);
+
+  const deleteExpiredAssignments = async () => {
+    try {
+      await supabase.rpc('delete_expired_assignments');
+    } catch (error) {
+      console.error('Error deleting expired assignments:', error);
+    }
+  };
+
+  const fetchDashboardData = async () => {
+    if (!user) return;
+
+    try {
+      // Fetch assignment submissions count
+      const { count: submissionsCount } = await supabase
+        .from('assignment_submissions')
+        .select('*', { count: 'exact', head: true })
+        .eq('student_id', user.id);
+
+      setAssignmentsUploaded(submissionsCount || 0);
+
+      // Fetch graded submissions count
+      const { count: gradedCount } = await supabase
+        .from('assignment_submissions')
+        .select('*', { count: 'exact', head: true })
+        .eq('student_id', user.id)
+        .not('marks', 'is', null);
+
+      setAssignmentsCompleted(gradedCount || 0);
+
+      // Fetch recent activities (assignments, syllabus uploads, notes uploads)
+      const { data: activitiesData } = await supabase
+        .from('activities')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      setRecentActivities(activitiesData || []);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    }
+  };
 
   if (loading) {
     return (
@@ -35,37 +89,29 @@ const StudentDashboard: React.FC = () => {
     return null; // Will redirect
   }
 
-  const subjects = [
-    'Theory of Computation',
-    'Full Stack Development', 
-    'Data Base Management System',
-    'Software Engineering & Project Management',
-    'Block Chain Applications'
-  ];
-
   const dashboardCards = [
     {
       title: 'Quick Access',
       description: 'Jump to your most used sections',
       items: [
-        { icon: BookOpen, label: 'Syllabus', path: '/syllabus', color: 'bg-blue-500' },
-        { icon: Calendar, label: "Today's Updates", path: '/student-dashboard/updates', color: 'bg-green-500' },
-        { icon: FileText, label: 'Notes', path: '/notes', color: 'bg-purple-500' },
-        { icon: Clipboard, label: 'Assignments', path: '/assignments', color: 'bg-orange-500' }
+        { icon: BookOpen, label: 'Syllabus', path: '/syllabus', color: 'bg-gradient-to-br from-blue-500 to-blue-600' },
+        { icon: Calendar, label: "Today's Updates", path: '/student-dashboard/updates', color: 'bg-gradient-to-br from-green-500 to-green-600' },
+        { icon: FileText, label: 'Notes', path: '/notes', color: 'bg-gradient-to-br from-purple-500 to-purple-600' },
+        { icon: Clipboard, label: 'Assignments', path: '/assignments', color: 'bg-gradient-to-br from-orange-500 to-orange-600' }
       ]
     },
     {
       title: 'Recent Activity',
-      description: 'Your latest learning activities',
-      items: []
+      description: 'Latest updates from faculty and your submissions',
+      items: recentActivities
     },
     {
       title: 'Progress Overview',
       description: 'Track your academic journey',
       stats: [
         { label: 'Subjects Enrolled', value: '5', icon: BookOpen },
-        { label: 'Assignments Completed', value: '0', icon: Clipboard },
-        { label: 'Study Hours This Week', value: '0', icon: TrendingUp }
+        { label: 'Assignments Uploaded', value: assignmentsUploaded.toString(), icon: Upload },
+        { label: 'Assignments Completed', value: assignmentsCompleted.toString(), icon: Clipboard }
       ]
     }
   ];
@@ -79,66 +125,7 @@ const StudentDashboard: React.FC = () => {
         
         <main className="p-4 lg:p-6">
           <div className="max-w-7xl mx-auto">
-            {/* Subject Cards Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-              {subjects.map((subject, index) => (
-                <Card key={subject} className="group hover:shadow-lg transition-all duration-300 border-l-4 border-l-primary/60 hover:border-l-primary">
-                  <CardHeader>
-                    <div className="flex items-center space-x-3">
-                      <div className="p-2 bg-gradient-to-br from-primary/20 to-primary/10 rounded-lg group-hover:from-primary/30 group-hover:to-primary/20 transition-colors">
-                        <BookOpen className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-lg bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">{subject}</CardTitle>
-                        <CardDescription>5th Semester</CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 gap-3">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => navigate('/syllabus')}
-                        className="flex items-center space-x-2 hover:bg-primary/10 hover:border-primary/50"
-                      >
-                        <FileText className="w-4 h-4" />
-                        <span>Syllabus</span>
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => navigate('/notes')}
-                        className="flex items-center space-x-2 hover:bg-primary/10 hover:border-primary/50"
-                      >
-                        <BookOpen className="w-4 h-4" />
-                        <span>Notes</span>
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => navigate('/assignments')}
-                        className="flex items-center space-x-2 hover:bg-primary/10 hover:border-primary/50"
-                      >
-                        <FileCheck className="w-4 h-4" />
-                        <span>Assignments</span>
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => navigate('/assessment')}
-                        className="flex items-center space-x-2 hover:bg-primary/10 hover:border-primary/50"
-                      >
-                        <Trophy className="w-4 h-4" />
-                        <span>Assessment</span>
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
               {/* Quick Access Card */}
               <Card className="xl:col-span-2">
                 <CardHeader>
@@ -153,11 +140,11 @@ const StudentDashboard: React.FC = () => {
                         <Button
                           key={index}
                           variant="outline"
-                          className="h-24 flex-col space-y-2 hover:bg-muted/50 transition-colors"
+                          className="h-24 flex-col space-y-2 hover:bg-muted/50 transition-colors border-2 hover:border-primary/50"
                           onClick={() => navigate(item.path)}
                         >
-                          <div className={`p-2 rounded-lg ${item.color} text-white`}>
-                            <Icon className="h-5 w-5" />
+                          <div className={`p-3 rounded-xl ${item.color} text-white shadow-lg`}>
+                            <Icon className="h-6 w-6" />
                           </div>
                           <span className="text-sm font-medium text-center">{item.label}</span>
                         </Button>
@@ -197,24 +184,44 @@ const StudentDashboard: React.FC = () => {
                   <CardTitle>{dashboardCards[1].title}</CardTitle>
                   <CardDescription>{dashboardCards[1].description}</CardDescription>
                 </CardHeader>
-              <CardContent>
+                <CardContent>
                 {dashboardCards[1].items.length === 0 ? (
                   <div className="text-center py-8">
+                    <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                     <p className="text-muted-foreground">No recent activities to display</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {dashboardCards[1].items.map((item: any, index: number) => (
-                      <div key={index} className="flex items-center space-x-4 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
-                        <div className="p-2 bg-muted rounded-lg">
-                          <Clock className="h-4 w-4 text-muted-foreground" />
+                    {dashboardCards[1].items.map((item: any, index: number) => {
+                      const getActivityIcon = (activityType: string) => {
+                        switch (activityType) {
+                          case 'assignment_upload':
+                            return Clipboard;
+                          case 'assignment_submit':
+                            return Upload;
+                          case 'syllabus_upload':
+                            return BookOpen;
+                          case 'notes_upload':
+                            return FileText;
+                          default:
+                            return Clock;
+                        }
+                      };
+
+                      const ActivityIcon = getActivityIcon(item.activity_type);
+                      return (
+                        <div key={index} className="flex items-center space-x-4 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
+                          <div className="p-2 bg-primary/10 rounded-lg">
+                            <ActivityIcon className="h-4 w-4 text-primary" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-foreground">{item.title}</p>
+                            <p className="text-xs text-muted-foreground">{item.subject}</p>
+                            <p className="text-xs text-muted-foreground">{new Date(item.created_at).toLocaleString()}</p>
+                          </div>
                         </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-foreground">{item.label}</p>
-                          <p className="text-xs text-muted-foreground">{item.time}</p>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>

@@ -14,6 +14,75 @@ export type Database = {
   }
   public: {
     Tables: {
+      activities: {
+        Row: {
+          activity_type: string
+          created_at: string
+          description: string | null
+          id: string
+          subject: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          activity_type: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          subject: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          activity_type?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          subject?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      assignment_submissions: {
+        Row: {
+          assignment_id: string
+          feedback: string | null
+          file_name: string
+          file_url: string
+          graded_at: string | null
+          graded_by: string | null
+          id: string
+          marks: number | null
+          student_id: string
+          submitted_at: string
+        }
+        Insert: {
+          assignment_id: string
+          feedback?: string | null
+          file_name: string
+          file_url: string
+          graded_at?: string | null
+          graded_by?: string | null
+          id?: string
+          marks?: number | null
+          student_id: string
+          submitted_at?: string
+        }
+        Update: {
+          assignment_id?: string
+          feedback?: string | null
+          file_name?: string
+          file_url?: string
+          graded_at?: string | null
+          graded_by?: string | null
+          id?: string
+          marks?: number | null
+          student_id?: string
+          submitted_at?: string
+        }
+        Relationships: []
+      }
       assignments: {
         Row: {
           created_at: string
@@ -219,6 +288,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      delete_expired_assignments: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       is_faculty: {
         Args: { _user_id: string }
         Returns: boolean

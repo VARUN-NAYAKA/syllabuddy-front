@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import { useToast } from '@/hooks/use-toast';
 
 const Assignments: React.FC = () => {
   const navigate = useNavigate();
@@ -18,18 +19,48 @@ const Assignments: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [open, setOpen] = useState(false);
+  const [submissionDialogOpen, setSubmissionDialogOpen] = useState(false);
+  const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
+  const [submissionFile, setSubmissionFile] = useState<File | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submissions, setSubmissions] = useState<Record<string, any>>({});
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     dueDate: '',
     file: null as File | null
   });
+  const { toast: toastHook } = useToast();
 
   const isFaculty = profile?.user_type === 'faculty';
 
   useEffect(() => {
     fetchAssignmentsData();
-  }, [profile]);
+    if (!isFaculty && user) {
+      fetchSubmissions();
+    }
+  }, [profile, user]);
+
+  const fetchSubmissions = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('assignment_submissions')
+        .select('*')
+        .eq('student_id', user.id);
+
+      if (error) throw error;
+
+      const submissionsMap: Record<string, any> = {};
+      data?.forEach(submission => {
+        submissionsMap[submission.assignment_id] = submission;
+      });
+      setSubmissions(submissionsMap);
+    } catch (error) {
+      console.error('Error fetching submissions:', error);
+    }
+  };
 
   const fetchAssignmentsData = async () => {
     try {
@@ -134,6 +165,17 @@ const Assignments: React.FC = () => {
 
       if (dbError) throw dbError;
 
+      // Log activity
+      await supabase
+        .from('activities')
+        .insert([{
+          user_id: user.id,
+          activity_type: 'assignment_upload',
+          subject: profile.subject,
+          title: `New assignment: ${formData.title.trim()}`,
+          description: formData.description.trim() || null
+        }]);
+
       toast.success('Assignment uploaded successfully!');
       setOpen(false);
       setFormData({ title: '', description: '', dueDate: '', file: null });
@@ -160,6 +202,75 @@ const Assignments: React.FC = () => {
     } catch (error) {
       console.error('Error deleting assignment:', error);
       toast.error('Failed to delete assignment');
+    }
+  };
+
+  const handleSubmissionFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const selectedFile = e.target.files[0];
+      if (selectedFile.type === 'application/pdf') {
+        setSubmissionFile(selectedFile);
+      } else {
+        toast.error('Please select a PDF file');
+      }
+    }
+  };
+
+  const handleSubmitAssignment = async () => {
+    if (!submissionFile || !selectedAssignment || !user) return;
+
+    setSubmitting(true);
+
+    try {
+      // Upload file to storage
+      const fileName = `${Date.now()}_${user.id}_${submissionFile.name}`;
+      const filePath = `${selectedAssignment.subject.replace(/\s+/g, '_').toLowerCase()}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('student_submissions')
+        .upload(filePath, submissionFile);
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('student_submissions')
+        .getPublicUrl(filePath);
+
+      // Save to database
+      const { error: dbError } = await supabase
+        .from('assignment_submissions')
+        .insert([{
+          assignment_id: selectedAssignment.id,
+          student_id: user.id,
+          file_url: publicUrl,
+          file_name: submissionFile.name,
+          subject: selectedAssignment.subject
+        }]);
+
+      if (dbError) throw dbError;
+
+      // Log activity
+      await supabase
+        .from('activities')
+        .insert([{
+          user_id: user.id,
+          activity_type: 'assignment_submit',
+          subject: selectedAssignment.subject,
+          title: `Submitted assignment: ${selectedAssignment.title}`,
+          description: `Student submitted answer for ${selectedAssignment.title}`
+        }]);
+
+      toast.success('Assignment submitted successfully!');
+      setSubmissionDialogOpen(false);
+      setSubmissionFile(null);
+      setSelectedAssignment(null);
+      fetchSubmissions();
+    } catch (error) {
+      console.error('Submission error:', error);
+      toast.error('Failed to submit assignment');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -309,6 +420,34 @@ const Assignments: React.FC = () => {
                             <Download className="w-4 h-4 mr-2" />
                             Download
                           </Button>
+                          
+                          {!isFaculty && (
+                            <>
+                              {submissions[assignment.id] ? (
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-sm text-green-600 font-medium">✓ Submitted</span>
+                                  {submissions[assignment.id].marks !== null && (
+                                    <span className="text-sm text-primary font-medium">
+                                      Marks: {submissions[assignment.id].marks}/10
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <Button
+                                  variant="default"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedAssignment(assignment);
+                                    setSubmissionDialogOpen(true);
+                                  }}
+                                >
+                                  <Upload className="w-4 h-4 mr-2" />
+                                  Submit
+                                </Button>
+                              )}
+                            </>
+                          )}
+                          
                           {isFaculty && assignment.uploaded_by === user?.id && (
                             <Button
                               variant="destructive"
@@ -328,6 +467,48 @@ const Assignments: React.FC = () => {
             </Card>
           ))}
         </div>
+
+        {/* Assignment Submission Dialog */}
+        <Dialog open={submissionDialogOpen} onOpenChange={setSubmissionDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Submit Assignment</DialogTitle>
+            </DialogHeader>
+            {selectedAssignment && (
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-medium">{selectedAssignment.title}</h4>
+                  <p className="text-sm text-muted-foreground">{selectedAssignment.subject}</p>
+                  {selectedAssignment.due_date && (
+                    <p className="text-sm text-muted-foreground">
+                      Due: {new Date(selectedAssignment.due_date).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="submissionFile">Upload your solution (PDF only)</Label>
+                  <Input
+                    id="submissionFile"
+                    type="file"
+                    accept=".pdf"
+                    onChange={handleSubmissionFileChange}
+                  />
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button variant="outline" onClick={() => setSubmissionDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleSubmitAssignment} 
+                    disabled={!submissionFile || submitting}
+                  >
+                    {submitting ? 'Submitting...' : 'Submit Assignment'}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

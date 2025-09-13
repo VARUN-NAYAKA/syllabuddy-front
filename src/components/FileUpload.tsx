@@ -98,6 +98,17 @@ const FileUpload: React.FC<FileUploadProps> = ({ type, subject, existingFile, on
         if (dbError) throw dbError;
       }
 
+      // Log activity
+      await supabase
+        .from('activities')
+        .insert([{
+          user_id: user.id,
+          activity_type: type === 'syllabus' ? 'syllabus_upload' : 'notes_upload',
+          subject: subject,
+          title: `${type === 'syllabus' ? 'Syllabus' : 'Notes'} ${existingFile ? 'updated' : 'uploaded'}: ${type === 'notes' ? title.trim() : subject}`,
+          description: `${existingFile ? 'Updated' : 'Uploaded'} ${type === 'syllabus' ? 'syllabus' : 'notes'} for ${subject}`
+        }]);
+
       toast.success(`${type === 'syllabus' ? 'Syllabus' : 'Notes'} uploaded successfully!`);
       setOpen(false);
       setFile(null);
