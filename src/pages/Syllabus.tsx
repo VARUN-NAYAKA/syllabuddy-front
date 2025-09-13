@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, BookOpen, FileText, ExternalLink } from 'lucide-react';
+import { ArrowLeft, BookOpen, FileText, ExternalLink, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import FileUpload from '@/components/FileUpload';
+import { toast } from 'sonner';
 
 const Syllabus: React.FC = () => {
   const navigate = useNavigate();
@@ -54,6 +55,23 @@ const Syllabus: React.FC = () => {
 
   const isFaculty = profile?.user_type === 'faculty';
 
+  const handleDeleteSyllabus = async (syllabusId: string) => {
+    try {
+      const { error } = await supabase
+        .from('syllabus')
+        .delete()
+        .eq('id', syllabusId);
+
+      if (error) throw error;
+
+      toast.success('Syllabus deleted successfully');
+      fetchSyllabusFiles();
+    } catch (error) {
+      console.error('Error deleting syllabus:', error);
+      toast.error('Failed to delete syllabus');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-background p-4">
       <div className="max-w-4xl mx-auto">
@@ -90,12 +108,24 @@ const Syllabus: React.FC = () => {
                         </p>
                       </div>
                       {isFaculty && profile?.subject === subject && (
-                        <FileUpload
-                          type="syllabus"
-                          subject={subject}
-                          existingFile={syllabusFile}
-                          onUploadSuccess={fetchSyllabusFiles}
-                        />
+                        <div className="flex space-x-2">
+                          <FileUpload
+                            type="syllabus"
+                            subject={subject}
+                            existingFile={syllabusFile}
+                            onUploadSuccess={fetchSyllabusFiles}
+                          />
+                          {syllabusFile && (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDeleteSyllabus(syllabusFile.id)}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete
+                            </Button>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>

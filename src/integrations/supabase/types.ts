@@ -131,6 +131,56 @@ export type Database = {
         }
         Relationships: []
       }
+      student_submissions: {
+        Row: {
+          assignment_id: string
+          feedback: string | null
+          file_name: string
+          file_url: string
+          graded_at: string | null
+          graded_by: string | null
+          id: string
+          marks: number | null
+          student_id: string
+          subject: string
+          submitted_at: string
+        }
+        Insert: {
+          assignment_id: string
+          feedback?: string | null
+          file_name: string
+          file_url: string
+          graded_at?: string | null
+          graded_by?: string | null
+          id?: string
+          marks?: number | null
+          student_id: string
+          subject: string
+          submitted_at?: string
+        }
+        Update: {
+          assignment_id?: string
+          feedback?: string | null
+          file_name?: string
+          file_url?: string
+          graded_at?: string | null
+          graded_by?: string | null
+          id?: string
+          marks?: number | null
+          student_id?: string
+          subject?: string
+          submitted_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_submissions_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assignments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       syllabus: {
         Row: {
           created_at: string

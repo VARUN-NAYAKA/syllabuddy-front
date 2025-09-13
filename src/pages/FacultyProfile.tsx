@@ -147,9 +147,9 @@ const FacultyProfile: React.FC = () => {
                   <option value="">Select Subject</option>
                   <option value="Theory of Computation">Theory of Computation</option>
                   <option value="Full Stack Development">Full Stack Development</option>
-                  <option value="Database Management System">Database Management System</option>
-                  <option value="Software Engineering and Project Management">Software Engineering and Project Management</option>
-                  <option value="Blockchain Application">Blockchain Application</option>
+                  <option value="Data Base Management System">Data Base Management System</option>
+                  <option value="Software Engineering & Project Management">Software Engineering & Project Management</option>
+                  <option value="Block Chain Applications">Block Chain Applications</option>
                 </select>
               </div>
 

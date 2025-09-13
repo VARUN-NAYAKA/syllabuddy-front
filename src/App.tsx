@@ -14,6 +14,7 @@ import FacultyProfile from "./pages/FacultyProfile";
 import Syllabus from "./pages/Syllabus";
 import Notes from "./pages/Notes";
 import Assignments from "./pages/Assignments";
+import Assessment from "./pages/Assessment";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import NotFound from "./pages/NotFound";
 
@@ -37,6 +38,10 @@ const App = () => (
               <Route path="/student-dashboard/notes" element={<Notes />} />
               <Route path="/student-dashboard/assignments" element={<Assignments />} />
               <Route path="/student-dashboard/help" element={<PlaceholderPage title="Help & Feedback" description="Get help and provide feedback about the platform." />} />
+              <Route path="/syllabus" element={<Syllabus />} />
+              <Route path="/notes" element={<Notes />} />
+              <Route path="/assignments" element={<Assignments />} />
+              <Route path="/assessment" element={<Assessment />} />
               <Route path="/faculty-dashboard" element={<FacultyDashboard />} />
               <Route path="/faculty-dashboard/profile" element={<FacultyProfile />} />
               <Route path="/faculty-dashboard/syllabus" element={<Syllabus />} />

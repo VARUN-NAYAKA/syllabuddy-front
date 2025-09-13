@@ -5,7 +5,7 @@ import Header from '@/components/layout/Header';
 import Sidebar from '@/components/layout/Sidebar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { BookOpen, Calendar, FileText, Clipboard, TrendingUp, Clock } from 'lucide-react';
+import { BookOpen, Calendar, FileText, Clipboard, TrendingUp, Clock, FileCheck, Trophy } from 'lucide-react';
 
 const StudentDashboard: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -35,15 +35,23 @@ const StudentDashboard: React.FC = () => {
     return null; // Will redirect
   }
 
+  const subjects = [
+    'Theory of Computation',
+    'Full Stack Development', 
+    'Data Base Management System',
+    'Software Engineering & Project Management',
+    'Block Chain Applications'
+  ];
+
   const dashboardCards = [
     {
       title: 'Quick Access',
       description: 'Jump to your most used sections',
       items: [
-        { icon: BookOpen, label: 'Syllabus', path: '/student-dashboard/syllabus', color: 'bg-blue-500' },
+        { icon: BookOpen, label: 'Syllabus', path: '/syllabus', color: 'bg-blue-500' },
         { icon: Calendar, label: "Today's Updates", path: '/student-dashboard/updates', color: 'bg-green-500' },
-        { icon: FileText, label: 'Notes', path: '/student-dashboard/notes', color: 'bg-purple-500' },
-        { icon: Clipboard, label: 'Assignments', path: '/student-dashboard/assignments', color: 'bg-orange-500' }
+        { icon: FileText, label: 'Notes', path: '/notes', color: 'bg-purple-500' },
+        { icon: Clipboard, label: 'Assignments', path: '/assignments', color: 'bg-orange-500' }
       ]
     },
     {
@@ -71,6 +79,65 @@ const StudentDashboard: React.FC = () => {
         
         <main className="p-4 lg:p-6">
           <div className="max-w-7xl mx-auto">
+            {/* Subject Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+              {subjects.map((subject, index) => (
+                <Card key={subject} className="group hover:shadow-lg transition-all duration-300 border-l-4 border-l-primary/60 hover:border-l-primary">
+                  <CardHeader>
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 bg-gradient-to-br from-primary/20 to-primary/10 rounded-lg group-hover:from-primary/30 group-hover:to-primary/20 transition-colors">
+                        <BookOpen className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">{subject}</CardTitle>
+                        <CardDescription>5th Semester</CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => navigate('/syllabus')}
+                        className="flex items-center space-x-2 hover:bg-primary/10 hover:border-primary/50"
+                      >
+                        <FileText className="w-4 h-4" />
+                        <span>Syllabus</span>
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => navigate('/notes')}
+                        className="flex items-center space-x-2 hover:bg-primary/10 hover:border-primary/50"
+                      >
+                        <BookOpen className="w-4 h-4" />
+                        <span>Notes</span>
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => navigate('/assignments')}
+                        className="flex items-center space-x-2 hover:bg-primary/10 hover:border-primary/50"
+                      >
+                        <FileCheck className="w-4 h-4" />
+                        <span>Assignments</span>
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => navigate('/assessment')}
+                        className="flex items-center space-x-2 hover:bg-primary/10 hover:border-primary/50"
+                      >
+                        <Trophy className="w-4 h-4" />
+                        <span>Assessment</span>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
               {/* Quick Access Card */}
               <Card className="xl:col-span-2">

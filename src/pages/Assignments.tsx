@@ -58,9 +58,9 @@ const Assignments: React.FC = () => {
         const subjects = [
           'Theory of Computation',
           'Full Stack Development', 
-          'Database Management System',
-          'Software Engineering and Project Management',
-          'Blockchain Application'
+          'Data Base Management System',
+          'Software Engineering & Project Management',
+          'Block Chain Applications'
         ];
         
         subjects.forEach(subject => {
@@ -290,11 +290,11 @@ const Assignments: React.FC = () => {
                           {assignment.description && (
                             <p className="text-sm text-muted-foreground mt-1">{assignment.description}</p>
                           )}
-                          <div className="flex items-center space-x-4 mt-2 text-xs text-muted-foreground">
+                            <div className="flex items-center space-x-4 mt-2 text-xs text-muted-foreground">
                             <span>Uploaded: {new Date(assignment.created_at).toLocaleDateString()}</span>
                             {assignment.due_date && (
                               <span className="flex items-center">
-                                <Calendar className="w-3 h-3 mr-1" />
+                                <Calendar className="w-3 h-3 mr-1 text-foreground/80 dark:text-foreground" />
                                 Due: {new Date(assignment.due_date).toLocaleDateString()}
                               </span>
                             )}

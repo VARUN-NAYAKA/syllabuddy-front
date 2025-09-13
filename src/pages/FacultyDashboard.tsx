@@ -133,7 +133,7 @@ const FacultyDashboard: React.FC = () => {
             {/* Subject Display */}
             {profile.subject && (
               <div className="text-center mb-6">
-                <h2 className="text-4xl font-bold text-primary drop-shadow-lg mb-2">
+                <h2 className="text-4xl font-bold text-primary dark:text-primary-foreground drop-shadow-lg mb-2">
                   {profile.subject}
                 </h2>
                 <p className="text-lg font-medium text-foreground bg-background/80 px-4 py-2 rounded-lg inline-block shadow-sm">
