@@ -143,17 +143,21 @@ const Assignments: React.FC = () => {
       const validFiles = selectedFiles.filter(file => 
         file.type === 'application/pdf' || 
         file.type === 'application/json' ||
+        file.type === 'image/jpeg' ||
+        file.type === 'image/jpg' ||
         file.name.endsWith('.pdf') ||
-        file.name.endsWith('.json')
+        file.name.endsWith('.json') ||
+        file.name.endsWith('.jpg') ||
+        file.name.endsWith('.jpeg')
       );
       
       if (validFiles.length === 0) {
-        toast.error('Please select PDF or JSON files');
+        toast.error('Please select PDF, JSON, or JPG files');
         return;
       }
       
       if (validFiles.length !== selectedFiles.length) {
-        toast.warning(`${selectedFiles.length - validFiles.length} file(s) skipped. Only PDF and JSON files are allowed.`);
+        toast.warning(`${selectedFiles.length - validFiles.length} file(s) skipped. Only PDF, JSON, and JPG files are allowed.`);
       }
       
       setFormData({ ...formData, files: validFiles });
@@ -431,17 +435,17 @@ const Assignments: React.FC = () => {
                             />
                           </div>
                           <div>
-                            <Label htmlFor="file">Files (PDF/JSON) *</Label>
+                            <Label htmlFor="file">Files (PDF/JSON/JPG) *</Label>
                             <Input
                               id="file"
                               type="file"
-                              accept=".pdf,.json"
+                              accept=".pdf,.json,.jpg,.jpeg"
                               multiple
                               onChange={handleFileChange}
                               className="cursor-pointer"
                             />
                             <p className="text-xs text-muted-foreground mt-1">
-                              Select multiple files or a folder. Only PDF and JSON files will be uploaded.
+                              Select multiple files or a folder. Only PDF, JSON, and JPG files will be uploaded.
                             </p>
                             {formData.files.length > 0 && (
                               <p className="text-sm text-primary mt-2">
