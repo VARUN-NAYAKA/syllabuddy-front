@@ -44,6 +44,44 @@ export type Database = {
         }
         Relationships: []
       }
+      assignment_files: {
+        Row: {
+          assignment_id: string
+          created_at: string
+          file_name: string
+          file_path: string
+          file_size: number | null
+          file_url: string
+          id: string
+        }
+        Insert: {
+          assignment_id: string
+          created_at?: string
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          file_url: string
+          id?: string
+        }
+        Update: {
+          assignment_id?: string
+          created_at?: string
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          file_url?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assignment_files_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assignments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assignment_submissions: {
         Row: {
           assignment_id: string
@@ -288,14 +326,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      delete_expired_assignments: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      is_faculty: {
-        Args: { _user_id: string }
-        Returns: boolean
-      }
+      delete_expired_assignments: { Args: never; Returns: undefined }
+      is_faculty: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       user_type: "student" | "faculty"

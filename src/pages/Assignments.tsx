@@ -28,18 +28,42 @@ const Assignments: React.FC = () => {
     title: '',
     description: '',
     dueDate: '',
-    file: null as File | null
+    files: [] as File[]
   });
+  const [assignmentFiles, setAssignmentFiles] = useState<Record<string, any[]>>({});
   const { toast: toastHook } = useToast();
 
   const isFaculty = profile?.user_type === 'faculty';
 
   useEffect(() => {
     fetchAssignmentsData();
+    fetchAssignmentFiles();
     if (!isFaculty && user) {
       fetchSubmissions();
     }
   }, [profile, user]);
+
+  const fetchAssignmentFiles = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('assignment_files')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      const filesMap: Record<string, any[]> = {};
+      data?.forEach(file => {
+        if (!filesMap[file.assignment_id]) {
+          filesMap[file.assignment_id] = [];
+        }
+        filesMap[file.assignment_id].push(file);
+      });
+      setAssignmentFiles(filesMap);
+    } catch (error) {
+      console.error('Error fetching assignment files:', error);
+    }
+  };
 
   const fetchSubmissions = async () => {
     if (!user) return;
@@ -114,18 +138,30 @@ const Assignments: React.FC = () => {
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const selectedFile = e.target.files[0];
-      if (selectedFile.type === 'application/pdf') {
-        setFormData({ ...formData, file: selectedFile });
-      } else {
-        toast.error('Please select a PDF file');
+    if (e.target.files && e.target.files.length > 0) {
+      const selectedFiles = Array.from(e.target.files);
+      const validFiles = selectedFiles.filter(file => 
+        file.type === 'application/pdf' || 
+        file.type === 'application/json' ||
+        file.name.endsWith('.pdf') ||
+        file.name.endsWith('.json')
+      );
+      
+      if (validFiles.length === 0) {
+        toast.error('Please select PDF or JSON files');
+        return;
       }
+      
+      if (validFiles.length !== selectedFiles.length) {
+        toast.warning(`${selectedFiles.length - validFiles.length} file(s) skipped. Only PDF and JSON files are allowed.`);
+      }
+      
+      setFormData({ ...formData, files: validFiles });
     }
   };
 
   const handleUpload = async () => {
-    if (!formData.file || !user || !profile?.subject) return;
+    if (formData.files.length === 0 || !user || !profile?.subject) return;
 
     if (!formData.title.trim()) {
       toast.error('Please enter a title for the assignment');
@@ -135,35 +171,68 @@ const Assignments: React.FC = () => {
     setUploading(true);
 
     try {
-      // Upload file to storage
-      const fileName = `${Date.now()}_${formData.file.name}`;
-      const filePath = `${profile.subject.replace(/\s+/g, '_').toLowerCase()}/${fileName}`;
+      // First create the assignment record with a placeholder file
+      const firstFile = formData.files[0];
+      const firstFileName = `${Date.now()}_${firstFile.name}`;
+      const firstFilePath = `${profile.subject.replace(/\s+/g, '_').toLowerCase()}/${firstFileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('assignments')
-        .upload(filePath, formData.file);
+        .upload(firstFilePath, firstFile);
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('assignments')
-        .getPublicUrl(filePath);
+        .getPublicUrl(firstFilePath);
 
-      // Save to database
-      const { error: dbError } = await supabase
+      // Create assignment record
+      const { data: assignmentData, error: dbError } = await supabase
         .from('assignments')
         .insert([{
           title: formData.title.trim(),
           description: formData.description.trim(),
           subject: profile.subject,
           file_url: publicUrl,
-          file_name: formData.file.name,
+          file_name: firstFile.name,
           uploaded_by: user.id,
           due_date: formData.dueDate ? new Date(formData.dueDate).toISOString() : null
-        }]);
+        }])
+        .select()
+        .single();
 
       if (dbError) throw dbError;
+
+      // Upload all files and create assignment_files records
+      const fileUploadPromises = formData.files.map(async (file, index) => {
+        const fileName = `${Date.now()}_${index}_${file.name}`;
+        const filePath = `${profile.subject.replace(/\s+/g, '_').toLowerCase()}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('assignments')
+          .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('assignments')
+          .getPublicUrl(filePath);
+
+        // Create assignment_files record
+        const { error: fileDbError } = await supabase
+          .from('assignment_files')
+          .insert([{
+            assignment_id: assignmentData.id,
+            file_name: file.name,
+            file_url: publicUrl,
+            file_path: filePath,
+            file_size: file.size
+          }]);
+
+        if (fileDbError) throw fileDbError;
+      });
+
+      await Promise.all(fileUploadPromises);
 
       // Log activity
       await supabase
@@ -173,13 +242,14 @@ const Assignments: React.FC = () => {
           activity_type: 'assignment_upload',
           subject: profile.subject,
           title: `New assignment: ${formData.title.trim()}`,
-          description: formData.description.trim() || null
+          description: `${formData.description.trim() || ''} (${formData.files.length} file${formData.files.length > 1 ? 's' : ''})`
         }]);
 
-      toast.success('Assignment uploaded successfully!');
+      toast.success(`Assignment with ${formData.files.length} file(s) uploaded successfully!`);
       setOpen(false);
-      setFormData({ title: '', description: '', dueDate: '', file: null });
+      setFormData({ title: '', description: '', dueDate: '', files: [] });
       fetchAssignmentsData();
+      fetchAssignmentFiles();
     } catch (error) {
       console.error('Upload error:', error);
       toast.error('Failed to upload assignment');
@@ -361,13 +431,23 @@ const Assignments: React.FC = () => {
                             />
                           </div>
                           <div>
-                            <Label htmlFor="file">PDF File *</Label>
+                            <Label htmlFor="file">Files (PDF/JSON) *</Label>
                             <Input
                               id="file"
                               type="file"
-                              accept=".pdf"
+                              accept=".pdf,.json"
+                              multiple
                               onChange={handleFileChange}
+                              className="cursor-pointer"
                             />
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Select multiple files or a folder. Only PDF and JSON files will be uploaded.
+                            </p>
+                            {formData.files.length > 0 && (
+                              <p className="text-sm text-primary mt-2">
+                                {formData.files.length} file(s) selected
+                              </p>
+                            )}
                           </div>
                           <div className="flex justify-end space-x-2">
                             <Button variant="outline" onClick={() => setOpen(false)}>
@@ -375,7 +455,7 @@ const Assignments: React.FC = () => {
                             </Button>
                             <Button 
                               onClick={handleUpload} 
-                              disabled={!formData.file || !formData.title.trim() || uploading}
+                              disabled={formData.files.length === 0 || !formData.title.trim() || uploading}
                             >
                               {uploading ? 'Uploading...' : 'Upload'}
                             </Button>
@@ -412,14 +492,34 @@ const Assignments: React.FC = () => {
                           </div>
                         </div>
                         <div className="flex flex-wrap gap-2 justify-end sm:justify-start">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => window.open(assignment.file_url, '_blank')}
-                          >
-                            <Download className="w-4 h-4 mr-2" />
-                            Download
-                          </Button>
+                          {assignmentFiles[assignment.id] && assignmentFiles[assignment.id].length > 0 ? (
+                            <div className="flex flex-wrap gap-2 w-full">
+                              <span className="text-sm text-muted-foreground w-full mb-1">
+                                {assignmentFiles[assignment.id].length} file(s):
+                              </span>
+                              {assignmentFiles[assignment.id].map((file: any) => (
+                                <Button
+                                  key={file.id}
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => window.open(file.file_url, '_blank')}
+                                  className="text-xs"
+                                >
+                                  <Download className="w-3 h-3 mr-1" />
+                                  {file.file_name}
+                                </Button>
+                              ))}
+                            </div>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => window.open(assignment.file_url, '_blank')}
+                            >
+                              <Download className="w-4 h-4 mr-2" />
+                              Download
+                            </Button>
+                          )}
                           
                           {!isFaculty && (
                             <>
