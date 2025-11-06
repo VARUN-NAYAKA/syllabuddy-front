@@ -29,10 +29,10 @@ const FileUpload: React.FC<FileUploadProps> = ({ type, subject, existingFile, on
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
-      if (selectedFile.type === 'application/pdf') {
+      if (selectedFile.type === 'application/pdf' || selectedFile.type === 'application/json') {
         setFile(selectedFile);
       } else {
-        toast.error('Please select a PDF file');
+        toast.error('Please select a PDF or JSON file');
       }
     }
   };
@@ -49,7 +49,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ type, subject, existingFile, on
 
     try {
       // Upload file to storage
-      const fileExt = 'pdf';
+      const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}_${file.name}`;
       const filePath = `${subject.replace(/\s+/g, '_').toLowerCase()}/${fileName}`;
 
@@ -149,11 +149,11 @@ const FileUpload: React.FC<FileUploadProps> = ({ type, subject, existingFile, on
             </div>
           )}
           <div>
-            <Label htmlFor="file">PDF File</Label>
+            <Label htmlFor="file">PDF or JSON File</Label>
             <Input
               id="file"
               type="file"
-              accept=".pdf"
+              accept=".pdf,.json"
               onChange={handleFileChange}
             />
           </div>
